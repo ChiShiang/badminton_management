@@ -12,21 +12,23 @@ const CourtView = React.memo(({
   onResetWarmup,
   onStartGame,
   onEndGame,
+  onQuickFillCourt,
   // PlayerSelector props
   activeSelector,
   setActiveSelector,
   availablePlayers,
   players,
   onPlayerMove,
-  onPlayerSwap
+  onPlayerSwap,
+  waitingQueue,
+  restArea,
+  courts
 }) => {
   const totalPlayers = court.teamA.length + court.teamB.length;
 
   const handleQuickFillCourt = () => {
     if (availablePlayers.length >= 4) {
-      // 這個邏輯應該在主組件中處理
-      console.log('Quick fill court:', court.id);
-      // 可以通過 props 傳遞一個回調函數來處理
+      onQuickFillCourt(court.id);
     } else {
       alert(`排隊區人數不足，需要4人但只有${availablePlayers.length}人`);
     }
@@ -102,6 +104,9 @@ const CourtView = React.memo(({
               players={players}
               onPlayerMove={onPlayerMove}
               onPlayerSwap={onPlayerSwap}
+              waitingQueue={waitingQueue}
+              restArea={restArea}
+              courts={courts}
             />
           </div>
         </div>
@@ -123,6 +128,9 @@ const CourtView = React.memo(({
               players={players}
               onPlayerMove={onPlayerMove}
               onPlayerSwap={onPlayerSwap}
+              waitingQueue={waitingQueue}
+              restArea={restArea}
+              courts={courts}
             />
           </div>
         </div>
@@ -182,7 +190,7 @@ const CourtView = React.memo(({
             還需要 {4 - totalPlayers} 人才能開始比賽
           </div>
           <div className="text-xs text-yellow-600 text-center mt-1">
-            拖拽玩家到A隊或B隊區域，或與其他玩家互換位置
+            拖拽玩家到A隊或B隊區域，或點擊玩家選擇替換
           </div>
         </div>
       )}
@@ -199,14 +207,14 @@ const CourtView = React.memo(({
         </div>
       )}
 
-      {/* 互換操作提示 */}
-      {totalPlayers >= 2 && (
-        <div className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
-          <div className="text-xs text-blue-700 space-y-1">
-            <div>💡 <strong>場地互換操作：</strong></div>
-            <div>• 拖拽玩家到另一玩家上可直接互換位置</div>
-            <div>• 拖拽到滿員隊伍可選擇替換對象</div>
-            <div>• 支援與排隊區、休息區玩家互換</div>
+      {/* 點擊替換提示 */}
+      {totalPlayers >= 1 && (
+        <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
+          <div className="text-xs text-purple-700 space-y-1">
+            <div>🔄 <strong>點擊替換：</strong></div>
+            <div>• 點擊任一玩家顯示全員替換清單</div>
+            <div>• 拖拽玩家到另一玩家上可直接互換</div>
+            <div>• 支援與排隊區、休息區玩家替換</div>
             <div>• A隊↔B隊之間也可以互換</div>
           </div>
         </div>

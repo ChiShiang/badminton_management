@@ -111,12 +111,20 @@ const BadmintonManager = () => {
 
   // 處理玩家互換（包括跨區域互換）
   const handlePlayerSwap = useCallback((playerId1, playerId2) => {
-    playerManager.swapPlayers(playerId1, playerId2);
+    const success = playerManager.swapPlayers(playerId1, playerId2);
+    if (!success) {
+      alert('互換失敗，請檢查玩家位置或重試');
+    }
   }, [playerManager]);
 
   // 增強的移動處理器，支援替換邏輯
   const handlePlayerMove = useCallback((playerId, targetLocation, targetPlayerId = null) => {
-    return playerManager.movePlayer(playerId, targetLocation, targetPlayerId);
+    const success = playerManager.movePlayer(playerId, targetLocation, targetPlayerId);
+    if (!success && !targetPlayerId) {
+      // 如果移動失敗且不是替換操作，可能需要顯示替換選擇器
+      console.log('Move failed, may need replacement selection');
+    }
+    return success;
   }, [playerManager]);
 
   // 快速填滿場地
@@ -274,6 +282,10 @@ const BadmintonManager = () => {
                     players={players}
                     onPlayerMove={handlePlayerMove}
                     onPlayerSwap={handlePlayerSwap}
+                    // 新增狀態 props
+                    waitingQueue={waitingQueue}
+                    restArea={restArea}
+                    courts={courts}
                   />
                 ))}
               </div>
@@ -317,6 +329,9 @@ const BadmintonManager = () => {
                   players={players}
                   onPlayerMove={handlePlayerMove}
                   onPlayerSwap={handlePlayerSwap}
+                  // 新增狀態 props
+                  restArea={restArea}
+                  courts={courts}
                 />
               </div>
             </div>
@@ -364,6 +379,10 @@ const BadmintonManager = () => {
                     players={players}
                     onPlayerMove={handlePlayerMove}
                     onPlayerSwap={handlePlayerSwap}
+                    // 新增狀態 props
+                    waitingQueue={waitingQueue}
+                    restArea={restArea}
+                    courts={courts}
                   />
                 )}
                 
@@ -405,6 +424,18 @@ const BadmintonManager = () => {
               </div>
             </div>
 
+            {/* 點擊替換說明 */}
+            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+              <h4 className="text-sm font-semibold text-purple-700 mb-2">🔄 點擊替換功能</h4>
+              <div className="text-xs text-purple-600 space-y-1">
+                <div>• <strong>點擊玩家卡片</strong>：顯示全員替換清單</div>
+                <div>• <strong>狀態顯示</strong>：🟢可用 🔵排隊 🟣場上 🟠休息</div>
+                <div>• <strong>分類清單</strong>：按狀態分組顯示所有玩家</div>
+                <div>• <strong>一鍵替換</strong>：點擊目標玩家完成替換</div>
+                <div>• <strong>跨區替換</strong>：可與任何區域的玩家替換</div>
+              </div>
+            </div>
+
             {/* 拖拽說明 */}
             <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
               <h4 className="text-sm font-semibold text-blue-700 mb-2">💡 拖拽操作說明</h4>
@@ -413,7 +444,6 @@ const BadmintonManager = () => {
                 <div>• <strong>直接互換</strong>：拖拽玩家到另一玩家上互換位置</div>
                 <div>• <strong>滿員替換</strong>：拖拽到滿員區域時選擇替換對象</div>
                 <div>• <strong>場地限制</strong>：A隊/B隊各最多2人</div>
-                <div>• <strong>跨區互換</strong>：支援場地↔排隊↔休息區互換</div>
                 <div>• <strong>視覺提示</strong>：拖拽時有高亮和提示效果</div>
               </div>
             </div>

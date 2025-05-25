@@ -9,7 +9,9 @@ const QueueGroups = React.memo(({
   availablePlayers,
   players,
   onPlayerMove,
-  onPlayerSwap
+  onPlayerSwap,
+  restArea,
+  courts
 }) => {
   const [dragOverQueue, setDragOverQueue] = useState(false);
 
@@ -84,6 +86,9 @@ const QueueGroups = React.memo(({
                 players={players}
                 onPlayerMove={onPlayerMove}
                 onPlayerSwap={onPlayerSwap}
+                waitingQueue={waitingQueue}
+                restArea={restArea}
+                courts={courts}
               />
             </div>
             
@@ -101,6 +106,9 @@ const QueueGroups = React.memo(({
                 players={players}
                 onPlayerMove={onPlayerMove}
                 onPlayerSwap={onPlayerSwap}
+                waitingQueue={waitingQueue}
+                restArea={restArea}
+                courts={courts}
               />
             </div>
           </div>
@@ -175,7 +183,7 @@ const QueueGroups = React.memo(({
             <div>💡 <strong>排隊區操作提示：</strong></div>
             <div>• 每組4人會自動分為A、B兩隊</div>
             <div>• 可在組內拖拽調整隊伍分配</div>
-            <div>• 支援與場地、休息區玩家互換</div>
+            <div>• 點擊玩家可從全員中選擇替換</div>
             <div>• 拖拽到其他玩家上可直接互換位置</div>
           </div>
         </div>

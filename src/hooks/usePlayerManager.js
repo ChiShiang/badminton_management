@@ -149,37 +149,48 @@ export const usePlayerManager = (players, setPlayers, waitingQueue, setWaitingQu
     
     if (!location1 || !location2) {
       console.warn('無法找到玩家位置');
-      return;
+      return false;
     }
 
-    // 同時移除兩個玩家
-    removePlayerFromLocation(playerId1, location1);
-    removePlayerFromLocation(playerId2, location2);
+    try {
+      // 創建臨時狀態來測試交換是否可行
+      // let tempSuccess = true;
+      
+      // 同時移除兩個玩家
+      removePlayerFromLocation(playerId1, location1);
+      removePlayerFromLocation(playerId2, location2);
 
-    // 稍微延遲後交換位置
-    setTimeout(() => {
+      // 立即嘗試交換位置
       try {
         addPlayerToLocation(playerId1, location2);
         addPlayerToLocation(playerId2, location1);
+        return true;
       } catch (error) {
         // 如果交換失敗，恢復原位置
         console.warn('交換失敗，恢復原位置:', error.message);
         addPlayerToLocation(playerId1, location1);
         addPlayerToLocation(playerId2, location2);
+        return false;
       }
-    }, 10);
+    } catch (error) {
+      console.error('交換操作失敗:', error);
+      return false;
+    }
   }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation]);
 
   // 移動玩家（包含替換邏輯）
   const movePlayer = useCallback((playerId, targetLocation, targetPlayerId = null) => {
     const gameState = { waitingQueue, restArea, courts };
     const sourceLocation = findPlayerLocation(playerId, gameState);
-    if (!sourceLocation) return;
+    
+    if (!sourceLocation) {
+      console.warn('無法找到源玩家位置');
+      return false;
+    }
 
     // 如果有目標玩家，執行互換
     if (targetPlayerId) {
-      swapPlayers(playerId, targetPlayerId);
-      return;
+      return swapPlayers(playerId, targetPlayerId);
     }
 
     // 檢查目標位置是否已滿
@@ -192,27 +203,61 @@ export const usePlayerManager = (players, setPlayers, waitingQueue, setWaitingQu
       }
     }
 
-    // 如果目標位置已滿，需要替換邏輯（這會在PlayerSelector中處理）
+    // 如果目標位置已滿，返回false讓UI處理替換選擇
     if (isTargetFull) {
-      return false; // 返回false表示需要選擇替換對象
+      return false;
     }
 
-    // 普通移動
-    removePlayerFromLocation(playerId, sourceLocation);
-    
-    setTimeout(() => {
+    try {
+      // 普通移動
+      removePlayerFromLocation(playerId, sourceLocation);
+      addPlayerToLocation(playerId, targetLocation);
+      return true;
+    } catch (error) {
+      // 如果移動失敗，恢復原位置
+      console.warn('移動失敗，恢復原位置:', error.message);
       try {
-        addPlayerToLocation(playerId, targetLocation);
-      } catch (error) {
-        // 如果移動失敗，恢復原位置
-        console.warn('移動失敗，恢復原位置:', error.message);
         addPlayerToLocation(playerId, sourceLocation);
-        alert(error.message);
+      } catch (restoreError) {
+        console.error('恢復原位置失敗:', restoreError);
       }
-    }, 10);
-
-    return true;
+      return false;
+    }
   }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation, swapPlayers]);
+
+  // 替換玩家（新增函數，專門處理替換邏輯）
+  const replacePlayer = useCallback((newPlayerId, targetPlayerId) => {
+    const gameState = { waitingQueue, restArea, courts };
+    const newPlayerLocation = findPlayerLocation(newPlayerId, gameState);
+    const targetPlayerLocation = findPlayerLocation(targetPlayerId, gameState);
+    
+    if (!newPlayerLocation || !targetPlayerLocation) {
+      console.warn('無法找到玩家位置');
+      return false;
+    }
+
+    try {
+      // 移除兩個玩家
+      removePlayerFromLocation(newPlayerId, newPlayerLocation);
+      removePlayerFromLocation(targetPlayerId, targetPlayerLocation);
+      
+      // 將新玩家放到目標位置，將目標玩家放到新玩家的原位置
+      addPlayerToLocation(newPlayerId, targetPlayerLocation);
+      addPlayerToLocation(targetPlayerId, newPlayerLocation);
+      
+      return true;
+    } catch (error) {
+      console.error('替換操作失敗:', error);
+      // 嘗試恢復原狀態
+      try {
+        addPlayerToLocation(newPlayerId, newPlayerLocation);
+        addPlayerToLocation(targetPlayerId, targetPlayerLocation);
+      } catch (restoreError) {
+        console.error('恢復原狀態失敗:', restoreError);
+      }
+      return false;
+    }
+  }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation]);
 
   return {
     // 狀態
@@ -237,6 +282,7 @@ export const usePlayerManager = (players, setPlayers, waitingQueue, setWaitingQu
     savePlayerInfo,
     cancelEditPlayer,
     movePlayer,
-    swapPlayers
+    swapPlayers,
+    replacePlayer
   };
 };
