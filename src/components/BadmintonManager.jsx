@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Plus, Users, Download, Upload, Settings, TrendingUp, UserPlus, Pause } from 'lucide-react';
 
 // 導入組件
@@ -27,6 +27,9 @@ const BadmintonManager = () => {
   const [autoQueue, setAutoQueue] = useState(true);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [activeSelector, setActiveSelector] = useState(null);
+
+  // 拖拽狀態
+  const [dragOverRest, setDragOverRest] = useState(false);
 
   // 使用自定義 Hooks
   const timerControls = useTimer(courts, setCourts);
@@ -64,13 +67,73 @@ const BadmintonManager = () => {
         alert(error.message);
       }
     }
+    // 清空input值，允許重複選擇同一文件
+    event.target.value = '';
   };
 
   // 快速操作
   const handleResetPositions = () => {
-    gameLogic.resetAllPositions();
-    setRestArea([]);
-    setActiveSelector(null);
+    if (window.confirm('確定要重置所有玩家位置嗎？這將把所有玩家移到排隊區。')) {
+      gameLogic.resetAllPositions();
+      setRestArea([]);
+      setActiveSelector(null);
+    }
+  };
+
+  // 休息區拖拽處理
+  const handleRestDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverRest(true);
+  }, []);
+
+  const handleRestDragLeave = useCallback((e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverRest(false);
+    }
+  }, []);
+
+  const handleRestDrop = useCallback((e) => {
+    e.preventDefault();
+    setDragOverRest(false);
+    
+    const playerId = e.dataTransfer.getData('text/plain');
+    if (playerId && !restArea.includes(playerId)) {
+      playerManager.movePlayer(playerId, { type: 'rest' });
+    }
+  }, [restArea, playerManager]);
+
+  const handleAddToRest = () => {
+    if (playerManager.availablePlayers.length > 0) {
+      playerManager.movePlayer(playerManager.availablePlayers[0].id, { type: 'rest' });
+    }
+  };
+
+  // 處理玩家互換（包括跨區域互換）
+  const handlePlayerSwap = useCallback((playerId1, playerId2) => {
+    playerManager.swapPlayers(playerId1, playerId2);
+  }, [playerManager]);
+
+  // 增強的移動處理器，支援替換邏輯
+  const handlePlayerMove = useCallback((playerId, targetLocation, targetPlayerId = null) => {
+    return playerManager.movePlayer(playerId, targetLocation, targetPlayerId);
+  }, [playerManager]);
+
+  // 快速填滿場地
+  const handleQuickFillCourt = useCallback((courtId) => {
+    gameLogic.quickFillCourt(courtId);
+  }, [gameLogic]);
+
+  // 自動填滿所有空場地
+  const handleAutoFillAllCourts = () => {
+    if (waitingQueue.length < 4) {
+      alert('排隊區人數不足，至少需要4人才能開始自動分配');
+      return;
+    }
+    
+    if (window.confirm('確定要自動分配玩家到所有空場地嗎？')) {
+      gameLogic.autoFillAllCourts();
+    }
   };
 
   return (
@@ -105,6 +168,7 @@ const BadmintonManager = () => {
               <button
                 onClick={handleExportData}
                 className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md"
+                disabled={players.length === 0}
               >
                 <Download className="w-4 h-4 mr-2" />
                 導出資料
@@ -113,7 +177,12 @@ const BadmintonManager = () => {
               <label className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors cursor-pointer shadow-md">
                 <Upload className="w-4 h-4 mr-2" />
                 導入資料
-                <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleImportData} 
+                  className="hidden" 
+                />
               </label>
             </div>
           </div>
@@ -144,6 +213,28 @@ const BadmintonManager = () => {
           </div>
         </div>
 
+        {/* 統計信息 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+            <div className="text-2xl font-bold text-blue-600">{players.length}</div>
+            <div className="text-sm text-gray-600">總玩家數</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+            <div className="text-2xl font-bold text-green-600">{waitingQueue.length}</div>
+            <div className="text-sm text-gray-600">排隊中</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+            <div className="text-2xl font-bold text-orange-600">{restArea.length}</div>
+            <div className="text-sm text-gray-600">休息中</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+            <div className="text-2xl font-bold text-purple-600">
+              {courts.reduce((total, court) => total + court.teamA.length + court.teamB.length, 0)}
+            </div>
+            <div className="text-sm text-gray-600">比賽中</div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* 場地區域 */}
           <div className="xl:col-span-2">
@@ -155,13 +246,7 @@ const BadmintonManager = () => {
                 </h2>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => {
-                      courts.forEach(court => {
-                        if (court.teamA.length === 0 && court.teamB.length === 0) {
-                          gameLogic.quickFillCourt(court.id);
-                        }
-                      });
-                    }}
+                    onClick={handleAutoFillAllCourts}
                     className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                     disabled={waitingQueue.length < 4}
                   >
@@ -182,14 +267,30 @@ const BadmintonManager = () => {
                     onResetWarmup={timerControls.resetWarmup}
                     onStartGame={gameLogic.startGame}
                     onEndGame={gameLogic.endGame}
+                    onQuickFillCourt={handleQuickFillCourt}
                     activeSelector={activeSelector}
                     setActiveSelector={setActiveSelector}
                     availablePlayers={playerManager.availablePlayers}
                     players={players}
-                    onPlayerMove={playerManager.movePlayer}
+                    onPlayerMove={handlePlayerMove}
+                    onPlayerSwap={handlePlayerSwap}
                   />
                 ))}
               </div>
+              
+              {courts.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  <TrendingUp className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <div className="text-lg mb-2">尚未建立場地</div>
+                  <div className="text-sm mb-4">點擊上方「新增場地」按鈕來建立第一個羽球場地</div>
+                  <button
+                    onClick={gameLogic.addCourt}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    建立第一個場地
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -214,7 +315,8 @@ const BadmintonManager = () => {
                   setActiveSelector={setActiveSelector}
                   availablePlayers={playerManager.availablePlayers}
                   players={players}
-                  onPlayerMove={playerManager.movePlayer}
+                  onPlayerMove={handlePlayerMove}
+                  onPlayerSwap={handlePlayerSwap}
                 />
               </div>
             </div>
@@ -225,18 +327,26 @@ const BadmintonManager = () => {
                 <Pause className="w-5 h-5 mr-2" />
                 休息區域
               </h3>
-              <div className="min-h-24 max-h-32 overflow-y-auto p-3 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50">
+              <div 
+                className={`min-h-24 max-h-32 overflow-y-auto p-3 border-2 border-dashed rounded-lg transition-all duration-300 ${
+                  dragOverRest 
+                    ? 'border-orange-500 bg-orange-100' 
+                    : 'border-orange-300 bg-orange-50'
+                }`}
+                onDragOver={handleRestDragOver}
+                onDragLeave={handleRestDragLeave}
+                onDrop={handleRestDrop}
+              >
                 {restArea.length === 0 ? (
                   <div className="text-center text-gray-500 py-4 flex flex-col items-center">
                     <Pause className="w-6 h-6 mb-2 text-gray-400" />
-                    <div className="text-sm">暫時休息的玩家</div>
+                    <div className="text-sm mb-2">
+                      {dragOverRest ? '放開以加入休息區' : '拖拽玩家到此處休息'}
+                    </div>
+                    <div className="text-xs text-gray-400 mb-3">或點擊下方按鈕</div>
                     <button
-                      onClick={() => {
-                        if (playerManager.availablePlayers.length > 0) {
-                          setRestArea([...restArea, playerManager.availablePlayers[0].id]);
-                        }
-                      }}
-                      className="mt-2 px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
+                      onClick={handleAddToRest}
+                      className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
                       disabled={playerManager.availablePlayers.length === 0}
                     >
                       添加休息玩家
@@ -252,8 +362,16 @@ const BadmintonManager = () => {
                     setActiveSelector={setActiveSelector}
                     availablePlayers={playerManager.availablePlayers}
                     players={players}
-                    onPlayerMove={playerManager.movePlayer}
+                    onPlayerMove={handlePlayerMove}
+                    onPlayerSwap={handlePlayerSwap}
                   />
+                )}
+                
+                {/* 拖拽提示 */}
+                {dragOverRest && restArea.length > 0 && (
+                  <div className="text-center text-orange-600 text-xs py-2 border-t border-orange-300 mt-2">
+                    放開以加入休息區
+                  </div>
                 )}
               </div>
               <div className="text-sm text-gray-600 mt-2 font-medium">
@@ -272,12 +390,31 @@ const BadmintonManager = () => {
                   重置所有人員位置
                 </button>
                 <button
-                  onClick={gameLogic.autoFillAllCourts}
+                  onClick={handleAutoFillAllCourts}
                   className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
                   disabled={waitingQueue.length < 4}
                 >
                   自動分配到所有場地
                 </button>
+                <button
+                  onClick={() => setShowPlayerModal(true)}
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  管理玩家資料
+                </button>
+              </div>
+            </div>
+
+            {/* 拖拽說明 */}
+            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+              <h4 className="text-sm font-semibold text-blue-700 mb-2">💡 拖拽操作說明</h4>
+              <div className="text-xs text-blue-600 space-y-1">
+                <div>• <strong>拖拽移動</strong>：拖拽玩家卡片到不同區域</div>
+                <div>• <strong>直接互換</strong>：拖拽玩家到另一玩家上互換位置</div>
+                <div>• <strong>滿員替換</strong>：拖拽到滿員區域時選擇替換對象</div>
+                <div>• <strong>場地限制</strong>：A隊/B隊各最多2人</div>
+                <div>• <strong>跨區互換</strong>：支援場地↔排隊↔休息區互換</div>
+                <div>• <strong>視覺提示</strong>：拖拽時有高亮和提示效果</div>
               </div>
             </div>
           </div>

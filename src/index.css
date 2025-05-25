@@ -107,3 +107,186 @@ code {
     scroll-behavior: auto !important;
   }
 }
+
+/* 新增到 index.css 中的拖拽樣式增強 */
+
+/* 拖拽樣式增強 */
+.dragging {
+  opacity: 0.6;
+  transform: rotate(5deg) scale(1.05);
+  z-index: 1000;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  border-color: #3b82f6 !important;
+}
+
+.drag-over {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6 !important;
+  border-style: solid !important;
+}
+
+/* 拖拽區域樣式 */
+.drop-zone {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.drop-zone:hover {
+  border-color: #6b7280;
+}
+
+.drop-zone.drag-over {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-color: #3b82f6;
+  transform: scale(1.02);
+}
+
+.drop-zone.drag-over::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px dashed #3b82f6;
+  border-radius: inherit;
+  background: rgba(59, 130, 246, 0.05);
+  animation: dragPulse 1.5s ease-in-out infinite;
+}
+
+/* 拖拽脈衝動畫 */
+@keyframes dragPulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.01);
+  }
+}
+
+/* 玩家卡片拖拽狀態 */
+.player-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.player-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.player-card.dragging {
+  cursor: grabbing;
+}
+
+.player-card:not(.dragging) {
+  cursor: grab;
+}
+
+/* 排隊區域特殊樣式 */
+.queue-zone {
+  min-height: 120px;
+  transition: all 0.3s ease;
+}
+
+.queue-zone.empty {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.queue-zone.drag-over {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-color: #3b82f6;
+}
+
+/* 場地區域特殊樣式 */
+.court-team-area {
+  transition: all 0.3s ease;
+  border-radius: 8px;
+}
+
+.court-team-area.drag-over {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+.court-team-area.team-b.drag-over {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+/* 休息區域樣式 */
+.rest-area {
+  background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+  border: 2px dashed #f97316;
+  transition: all 0.3s ease;
+  min-height: 80px;
+}
+
+.rest-area.drag-over {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  border-color: #ea580c;
+  transform: scale(1.02);
+}
+
+/* 觸控設備拖拽支援 */
+@media (hover: none) and (pointer: coarse) {
+  .player-card {
+    touch-action: none;
+  }
+  
+  .player-card:active {
+    transform: scale(1.05);
+    z-index: 1000;
+  }
+}
+
+/* 無障礙設計 */
+.player-card:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.drop-zone:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 響應式拖拽區域 */
+@media (max-width: 768px) {
+  .drop-zone {
+    min-height: 60px;
+    padding: 8px;
+  }
+  
+  .player-card {
+    font-size: 0.75rem;
+  }
+  
+  .dragging {
+    transform: rotate(3deg) scale(1.1);
+  }
+}
+
+/* 動畫優化 */
+@media (prefers-reduced-motion: reduce) {
+  .dragging,
+  .drag-over,
+  .drop-zone,
+  .player-card {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* 高對比度模式支援 */
+@media (prefers-contrast: high) {
+  .dragging {
+    border: 3px solid #000000 !important;
+    background-color: #ffffff !important;
+  }
+  
+  .drag-over {
+    border: 3px solid #000000 !important;
+    background-color: #ffff00 !important;
+  }
+}
