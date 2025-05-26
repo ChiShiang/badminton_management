@@ -100,164 +100,229 @@ export const usePlayerManager = (players, setPlayers, waitingQueue, setWaitingQu
     setEditPlayerSkillLevel(DEFAULT_SETTINGS.defaultSkillLevel);
   }, []);
 
-  // 從指定位置移除玩家
-  const removePlayerFromLocation = useCallback((playerId, location) => {
-    if (location.type === 'waiting') {
-      setWaitingQueue(prev => prev.filter(id => id !== playerId));
-    } else if (location.type === 'rest') {
-      setRestArea(prev => prev.filter(id => id !== playerId));
-    } else if (location.type === 'court') {
-      setCourts(prev => prev.map(court => 
-        court.id === location.courtId 
-          ? { ...court, [location.team]: court[location.team].filter(id => id !== playerId) }
-          : court
-      ));
-    }
-  }, [setWaitingQueue, setRestArea, setCourts]);
-
-  // 添加玩家到指定位置
-  const addPlayerToLocation = useCallback((playerId, targetLocation) => {
-    if (targetLocation.type === 'waiting') {
-      setWaitingQueue(prev => [...prev, playerId]);
-    } else if (targetLocation.type === 'rest') {
-      setRestArea(prev => [...prev, playerId]);
-    } else if (targetLocation.type === 'court') {
-      setCourts(prev => prev.map(court => {
-        if (court.id === targetLocation.courtId) {
-          const targetTeam = targetLocation.team;
-          const currentTeam = court[targetTeam];
-          
-          if (currentTeam.length < DEFAULT_SETTINGS.maxPlayersPerTeam) {
-            return {
-              ...court,
-              [targetTeam]: [...currentTeam, playerId]
-            };
-          } else {
-            throw new Error('該隊伍已滿');
-          }
-        }
-        return court;
-      }));
-    }
-  }, [setWaitingQueue, setRestArea, setCourts]);
-
-  // 智能玩家互換邏輯
-  const swapPlayers = useCallback((playerId1, playerId2) => {
-    const gameState = { waitingQueue, restArea, courts };
-    const location1 = findPlayerLocation(playerId1, gameState);
-    const location2 = findPlayerLocation(playerId2, gameState);
-    
-    if (!location1 || !location2) {
-      console.warn('無法找到玩家位置');
-      return false;
-    }
-
+  // 移動玩家 - 修正版本，添加返回值
+  const movePlayer = useCallback((playerId, targetLocation, targetPlayerId = null) => {
     try {
-      // 創建臨時狀態來測試交換是否可行
-      // let tempSuccess = true;
+      const gameState = { waitingQueue, restArea, courts };
+      const sourceLocation = findPlayerLocation(playerId, gameState);
       
-      // 同時移除兩個玩家
-      removePlayerFromLocation(playerId1, location1);
-      removePlayerFromLocation(playerId2, location2);
-
-      // 立即嘗試交換位置
-      try {
-        addPlayerToLocation(playerId1, location2);
-        addPlayerToLocation(playerId2, location1);
-        return true;
-      } catch (error) {
-        // 如果交換失敗，恢復原位置
-        console.warn('交換失敗，恢復原位置:', error.message);
-        addPlayerToLocation(playerId1, location1);
-        addPlayerToLocation(playerId2, location2);
+      if (!sourceLocation) {
+        console.error('找不到玩家當前位置');
         return false;
       }
-    } catch (error) {
-      console.error('交換操作失敗:', error);
-      return false;
-    }
-  }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation]);
 
-  // 移動玩家（包含替換邏輯）
-  const movePlayer = useCallback((playerId, targetLocation, targetPlayerId = null) => {
-    const gameState = { waitingQueue, restArea, courts };
-    const sourceLocation = findPlayerLocation(playerId, gameState);
-    
-    if (!sourceLocation) {
-      console.warn('無法找到源玩家位置');
-      return false;
-    }
+      // 如果有目標玩家，執行互換
+      if (targetPlayerId) {
+        const targetLocation_orig = findPlayerLocation(targetPlayerId, gameState);
+        if (!targetLocation_orig) {
+          console.error('找不到目標玩家位置');
+          return false;
+        }
 
-    // 如果有目標玩家，執行互換
-    if (targetPlayerId) {
-      return swapPlayers(playerId, targetPlayerId);
-    }
+        // 記錄原始位置索引（重要！保持順序）
+        let sourceIndex = -1;
+        let targetIndex = -1;
 
-    // 檢查目標位置是否已滿
-    let isTargetFull = false;
-    if (targetLocation.type === 'court') {
-      const targetCourt = courts.find(c => c.id === targetLocation.courtId);
-      if (targetCourt) {
-        const targetTeam = targetCourt[targetLocation.team];
-        isTargetFull = targetTeam.length >= DEFAULT_SETTINGS.maxPlayersPerTeam;
+        if (sourceLocation.type === 'waiting') {
+          sourceIndex = waitingQueue.indexOf(playerId);
+        }
+        if (targetLocation_orig.type === 'waiting') {
+          targetIndex = waitingQueue.indexOf(targetPlayerId);
+        }
+
+        // 執行互換 - 保持順序
+        if (sourceLocation.type === 'waiting' && targetLocation_orig.type === 'waiting') {
+          // 排隊區內互換 - 保持順序
+          setWaitingQueue(prev => {
+            const newQueue = [...prev];
+            if (sourceIndex !== -1 && targetIndex !== -1) {
+              // 直接交換位置
+              [newQueue[sourceIndex], newQueue[targetIndex]] = [newQueue[targetIndex], newQueue[sourceIndex]];
+            }
+            return newQueue;
+          });
+          return true;
+        } else if (sourceLocation.type === 'court' && targetLocation_orig.type === 'court') {
+          // 場地間互換 - 保持位置
+          setCourts(prev => prev.map(court => {
+            const newCourt = { ...court };
+            
+            // 處理源場地
+            if (court.id === sourceLocation.courtId) {
+              if (sourceLocation.team === 'teamA') {
+                const idx = court.teamA.indexOf(playerId);
+                if (idx !== -1 && court.id === targetLocation_orig.courtId && targetLocation_orig.team === 'teamA') {
+                  // 同場地同隊伍
+                  const targetIdx = court.teamA.indexOf(targetPlayerId);
+                  if (targetIdx !== -1) {
+                    newCourt.teamA = [...court.teamA];
+                    [newCourt.teamA[idx], newCourt.teamA[targetIdx]] = [newCourt.teamA[targetIdx], newCourt.teamA[idx]];
+                  }
+                } else {
+                  newCourt.teamA = court.teamA.map(id => id === playerId ? targetPlayerId : id);
+                }
+              } else {
+                const idx = court.teamB.indexOf(playerId);
+                if (idx !== -1 && court.id === targetLocation_orig.courtId && targetLocation_orig.team === 'teamB') {
+                  // 同場地同隊伍
+                  const targetIdx = court.teamB.indexOf(targetPlayerId);
+                  if (targetIdx !== -1) {
+                    newCourt.teamB = [...court.teamB];
+                    [newCourt.teamB[idx], newCourt.teamB[targetIdx]] = [newCourt.teamB[targetIdx], newCourt.teamB[idx]];
+                  }
+                } else {
+                  newCourt.teamB = court.teamB.map(id => id === playerId ? targetPlayerId : id);
+                }
+              }
+            }
+            
+            // 處理目標場地（如果不同）
+            if (court.id === targetLocation_orig.courtId && court.id !== sourceLocation.courtId) {
+              if (targetLocation_orig.team === 'teamA') {
+                newCourt.teamA = court.teamA.map(id => id === targetPlayerId ? playerId : id);
+              } else {
+                newCourt.teamB = court.teamB.map(id => id === targetPlayerId ? playerId : id);
+              }
+            }
+            
+            return newCourt;
+          }));
+          return true;
+        } else {
+          // 不同類型位置間的互換
+          // 先移除兩個玩家
+          setWaitingQueue(prev => prev.filter(id => id !== playerId && id !== targetPlayerId));
+          setRestArea(prev => prev.filter(id => id !== playerId && id !== targetPlayerId));
+          setCourts(prev => prev.map(court => ({
+            ...court,
+            teamA: court.teamA.filter(id => id !== playerId && id !== targetPlayerId),
+            teamB: court.teamB.filter(id => id !== playerId && id !== targetPlayerId)
+          })));
+
+          // 交換位置
+          setTimeout(() => {
+            // 將playerId放到targetPlayerId的原位置
+            if (targetLocation_orig.type === 'waiting') {
+              setWaitingQueue(prev => {
+                const newQueue = [...prev];
+                newQueue.splice(targetIndex !== -1 ? targetIndex : prev.length, 0, playerId);
+                return newQueue;
+              });
+            } else if (targetLocation_orig.type === 'rest') {
+              setRestArea(prev => [...prev, playerId]);
+            } else if (targetLocation_orig.type === 'court') {
+              setCourts(prev => prev.map(court => 
+                court.id === targetLocation_orig.courtId 
+                  ? { ...court, [targetLocation_orig.team]: [...court[targetLocation_orig.team], playerId] }
+                  : court
+              ));
+            }
+
+            // 將targetPlayerId放到playerId的原位置
+            if (sourceLocation.type === 'waiting') {
+              setWaitingQueue(prev => {
+                const newQueue = [...prev];
+                newQueue.splice(sourceIndex !== -1 ? sourceIndex : prev.length, 0, targetPlayerId);
+                return newQueue;
+              });
+            } else if (sourceLocation.type === 'rest') {
+              setRestArea(prev => [...prev, targetPlayerId]);
+            } else if (sourceLocation.type === 'court') {
+              setCourts(prev => prev.map(court => 
+                court.id === sourceLocation.courtId 
+                  ? { ...court, [sourceLocation.team]: [...court[sourceLocation.team], targetPlayerId] }
+                  : court
+              ));
+            }
+          }, 10);
+          return true;
+        }
       }
-    }
 
-    // 如果目標位置已滿，返回false讓UI處理替換選擇
-    if (isTargetFull) {
+      // 普通移動（非互換）
+      // 從原位置移除
+      if (sourceLocation.type === 'waiting') {
+        setWaitingQueue(prev => prev.filter(id => id !== playerId));
+      } else if (sourceLocation.type === 'rest') {
+        setRestArea(prev => prev.filter(id => id !== playerId));
+      } else if (sourceLocation.type === 'court') {
+        setCourts(prev => prev.map(court => 
+          court.id === sourceLocation.courtId 
+            ? { ...court, [sourceLocation.team]: court[sourceLocation.team].filter(id => id !== playerId) }
+            : court
+        ));
+      }
+
+      // 添加到新位置
+      if (targetLocation.type === 'waiting') {
+        setWaitingQueue(prev => [...prev, playerId]);
+        return true;
+      } else if (targetLocation.type === 'rest') {
+        setRestArea(prev => [...prev, playerId]);
+        return true;
+      } else if (targetLocation.type === 'court') {
+        let moveSuccess = false;
+        setCourts(prev => prev.map(court => {
+          if (court.id === targetLocation.courtId) {
+            const targetTeam = targetLocation.team;
+            const currentTeam = court[targetTeam];
+            
+            if (currentTeam.length < DEFAULT_SETTINGS.maxPlayersPerTeam) {
+              moveSuccess = true;
+              return {
+                ...court,
+                [targetTeam]: [...currentTeam, playerId]
+              };
+            } else {
+              alert('該隊伍已滿（最多2人）');
+              // 放回原位置
+              setTimeout(() => {
+                if (sourceLocation.type === 'waiting') {
+                  setWaitingQueue(prev => [...prev, playerId]);
+                } else if (sourceLocation.type === 'rest') {
+                  setRestArea(prev => [...prev, playerId]);
+                } else if (sourceLocation.type === 'court') {
+                  setCourts(prev => prev.map(c => 
+                    c.id === sourceLocation.courtId 
+                      ? { ...c, [sourceLocation.team]: [...c[sourceLocation.team], playerId] }
+                      : c
+                  ));
+                }
+              }, 10);
+              return court;
+            }
+          }
+          return court;
+        }));
+        return moveSuccess;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('移動玩家時發生錯誤:', error);
       return false;
     }
+  }, [waitingQueue, restArea, courts, setWaitingQueue, setRestArea, setCourts]);
 
+  // 玩家互換功能 - 移到 movePlayer 之後
+  const swapPlayers = useCallback((playerId1, playerId2) => {
     try {
-      // 普通移動
-      removePlayerFromLocation(playerId, sourceLocation);
-      addPlayerToLocation(playerId, targetLocation);
-      return true;
-    } catch (error) {
-      // 如果移動失敗，恢復原位置
-      console.warn('移動失敗，恢復原位置:', error.message);
-      try {
-        addPlayerToLocation(playerId, sourceLocation);
-      } catch (restoreError) {
-        console.error('恢復原位置失敗:', restoreError);
-      }
-      return false;
-    }
-  }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation, swapPlayers]);
-
-  // 替換玩家（新增函數，專門處理替換邏輯）
-  const replacePlayer = useCallback((newPlayerId, targetPlayerId) => {
-    const gameState = { waitingQueue, restArea, courts };
-    const newPlayerLocation = findPlayerLocation(newPlayerId, gameState);
-    const targetPlayerLocation = findPlayerLocation(targetPlayerId, gameState);
-    
-    if (!newPlayerLocation || !targetPlayerLocation) {
-      console.warn('無法找到玩家位置');
-      return false;
-    }
-
-    try {
-      // 移除兩個玩家
-      removePlayerFromLocation(newPlayerId, newPlayerLocation);
-      removePlayerFromLocation(targetPlayerId, targetPlayerLocation);
+      const gameState = { waitingQueue, restArea, courts };
+      const location1 = findPlayerLocation(playerId1, gameState);
+      const location2 = findPlayerLocation(playerId2, gameState);
       
-      // 將新玩家放到目標位置，將目標玩家放到新玩家的原位置
-      addPlayerToLocation(newPlayerId, targetPlayerLocation);
-      addPlayerToLocation(targetPlayerId, newPlayerLocation);
-      
-      return true;
-    } catch (error) {
-      console.error('替換操作失敗:', error);
-      // 嘗試恢復原狀態
-      try {
-        addPlayerToLocation(newPlayerId, newPlayerLocation);
-        addPlayerToLocation(targetPlayerId, targetPlayerLocation);
-      } catch (restoreError) {
-        console.error('恢復原狀態失敗:', restoreError);
+      if (!location1 || !location2) {
+        console.error('無法找到玩家位置');
+        return false;
       }
+
+      // 執行互換 - 使用 targetPlayerId 參數
+      return movePlayer(playerId1, location2, playerId2);
+    } catch (error) {
+      console.error('互換玩家時發生錯誤:', error);
       return false;
     }
-  }, [waitingQueue, restArea, courts, removePlayerFromLocation, addPlayerToLocation]);
+  }, [waitingQueue, restArea, courts, movePlayer]);
 
   return {
     // 狀態
@@ -282,7 +347,6 @@ export const usePlayerManager = (players, setPlayers, waitingQueue, setWaitingQu
     savePlayerInfo,
     cancelEditPlayer,
     movePlayer,
-    swapPlayers,
-    replacePlayer
+    swapPlayers // 新增互換方法
   };
 };

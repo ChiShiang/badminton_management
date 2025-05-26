@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Users, Download, Upload, Settings, TrendingUp, UserPlus, Pause } from 'lucide-react';
+import { Plus, Users, Download, Upload, Settings, TrendingUp, UserPlus, Trophy, Clock } from 'lucide-react';
 
 // 導入組件
 import CourtView from './Court/CourtView';
 import QueueGroups from './Queue/QueueGroups';
 import PlayerModal from './Player/PlayerModal';
-import PlayerSelector from './Player/PlayerSelector';
 import FullscreenButton from './Common/FullscreenButton';
 
 // 導入 Hooks
@@ -27,9 +26,9 @@ const BadmintonManager = () => {
   const [autoQueue, setAutoQueue] = useState(true);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [activeSelector, setActiveSelector] = useState(null);
-
-  // 拖拽狀態
-  const [dragOverRest, setDragOverRest] = useState(false);
+  
+  // 新增：頁籤狀態
+  const [activeTab, setActiveTab] = useState('courts'); // 'courts' 或 'queue'
 
   // 使用自定義 Hooks
   const timerControls = useTimer(courts, setCourts);
@@ -51,7 +50,7 @@ const BadmintonManager = () => {
 
   // 數據導入/導出處理
   const handleExportData = () => {
-    exportData(players, gameHistory, courts);
+    exportData(players, gameHistory, courts, restArea);
   };
 
   const handleImportData = async (event) => {
@@ -59,15 +58,54 @@ const BadmintonManager = () => {
     if (file) {
       try {
         const data = await importData(file);
-        if (data.players) setPlayers(data.players);
-        if (data.gameHistory) setGameHistory(data.gameHistory);
-        if (data.courts) setCourts(data.courts);
+        
+        // 先載入玩家資料
+        if (data.players) {
+          setPlayers(data.players);
+        }
+        
+        // 載入比賽歷史
+        if (data.gameHistory) {
+          setGameHistory(data.gameHistory);
+        }
+        
+        // 載入場地資料
+        if (data.courts) {
+          setCourts(data.courts);
+        }
+        
+        // 重要：根據場地資料重新分配玩家位置
+        if (data.players) {
+          // 收集所有已分配的玩家ID
+          const assignedPlayerIds = new Set();
+          
+          // 從場地收集玩家
+          if (data.courts) {
+            data.courts.forEach(court => {
+              court.teamA.forEach(id => assignedPlayerIds.add(id));
+              court.teamB.forEach(id => assignedPlayerIds.add(id));
+            });
+          }
+          
+          // 休息區的玩家（如果有保存的話）
+          const savedRestArea = data.restArea || [];
+          setRestArea(savedRestArea);
+          savedRestArea.forEach(id => assignedPlayerIds.add(id));
+          
+          // 剩餘的玩家都放到排隊區
+          const unassignedPlayers = data.players
+            .filter(player => !assignedPlayerIds.has(player.id))
+            .map(player => player.id);
+          
+          setWaitingQueue(unassignedPlayers);
+        }
+        
         alert('資料導入成功！');
       } catch (error) {
         alert(error.message);
       }
     }
-    // 清空input值，允許重複選擇同一文件
+    // 重置檔案輸入，允許重複選擇相同檔案
     event.target.value = '';
   };
 
@@ -77,35 +115,6 @@ const BadmintonManager = () => {
       gameLogic.resetAllPositions();
       setRestArea([]);
       setActiveSelector(null);
-    }
-  };
-
-  // 休息區拖拽處理
-  const handleRestDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverRest(true);
-  }, []);
-
-  const handleRestDragLeave = useCallback((e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      setDragOverRest(false);
-    }
-  }, []);
-
-  const handleRestDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragOverRest(false);
-    
-    const playerId = e.dataTransfer.getData('text/plain');
-    if (playerId && !restArea.includes(playerId)) {
-      playerManager.movePlayer(playerId, { type: 'rest' });
-    }
-  }, [restArea, playerManager]);
-
-  const handleAddToRest = () => {
-    if (playerManager.availablePlayers.length > 0) {
-      playerManager.movePlayer(playerManager.availablePlayers[0].id, { type: 'rest' });
     }
   };
 
@@ -121,7 +130,6 @@ const BadmintonManager = () => {
   const handlePlayerMove = useCallback((playerId, targetLocation, targetPlayerId = null) => {
     const success = playerManager.movePlayer(playerId, targetLocation, targetPlayerId);
     if (!success && !targetPlayerId) {
-      // 如果移動失敗且不是替換操作，可能需要顯示替換選擇器
       console.log('Move failed, may need replacement selection');
     }
     return success;
@@ -143,6 +151,28 @@ const BadmintonManager = () => {
       gameLogic.autoFillAllCourts();
     }
   };
+
+  // 頁籤組件
+  const TabButton = ({ id, label, icon: Icon, isActive, onClick, badge = null }) => (
+    <button
+      onClick={() => onClick(id)}
+      className={`flex items-center px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+        isActive
+          ? 'bg-white text-blue-600 border-b-2 border-blue-600 shadow-md'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800'
+      }`}
+    >
+      <Icon className="w-5 h-5 mr-2" />
+      {label}
+      {badge !== null && (
+        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+          isActive ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'
+        }`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -243,214 +273,191 @@ const BadmintonManager = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* 場地區域 */}
-          <div className="xl:col-span-2">
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold flex items-center text-gray-800">
-                  <TrendingUp className="w-6 h-6 mr-3 text-green-600" />
-                  比賽場地 ({courts.length})
-                </h2>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleAutoFillAllCourts}
-                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                    disabled={waitingQueue.length < 4}
-                  >
-                    自動填滿空場地
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {courts.map((court) => (
-                  <CourtView
-                    key={court.id}
-                    court={court}
-                    onRemoveCourt={gameLogic.removeCourt}
-                    onSetWarmupTime={timerControls.setWarmupTime}
-                    onStartWarmup={timerControls.startWarmup}
-                    onPauseWarmup={timerControls.pauseWarmup}
-                    onResetWarmup={timerControls.resetWarmup}
-                    onStartGame={gameLogic.startGame}
-                    onEndGame={gameLogic.endGame}
-                    onQuickFillCourt={handleQuickFillCourt}
-                    activeSelector={activeSelector}
-                    setActiveSelector={setActiveSelector}
-                    availablePlayers={playerManager.availablePlayers}
-                    players={players}
-                    onPlayerMove={handlePlayerMove}
-                    onPlayerSwap={handlePlayerSwap}
-                    // 新增狀態 props
-                    waitingQueue={waitingQueue}
-                    restArea={restArea}
-                    courts={courts}
-                  />
-                ))}
-              </div>
-              
-              {courts.length === 0 && (
-                <div className="text-center py-12 text-gray-500">
-                  <TrendingUp className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg mb-2">尚未建立場地</div>
-                  <div className="text-sm mb-4">點擊上方「新增場地」按鈕來建立第一個羽球場地</div>
-                  <button
-                    onClick={gameLogic.addCourt}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    建立第一個場地
-                  </button>
-                </div>
-              )}
+        {/* 主要內容區域 */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          {/* 頁籤導航 */}
+          <div className="bg-gray-50 border-b border-gray-200">
+            <div className="flex space-x-2 px-6 py-2">
+              <TabButton
+                id="courts"
+                label="比賽場地"
+                icon={Trophy}
+                isActive={activeTab === 'courts'}
+                onClick={setActiveTab}
+                badge={courts.length}
+              />
+              <TabButton
+                id="queue"
+                label="排隊管理"
+                icon={Clock}
+                isActive={activeTab === 'queue'}
+                onClick={setActiveTab}
+                badge={Math.ceil(waitingQueue.length / 4)}
+              />
             </div>
           </div>
 
-          {/* 右側區域 */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* 排隊區域 */}
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-blue-600 flex items-center">
-                  <Users className="w-5 h-5 mr-2" />
-                  排隊區域
-                </h3>
-                <div className="text-sm text-gray-500">
-                  {waitingQueue.length}人 / {Math.ceil(waitingQueue.length / 4)}組
-                </div>
-              </div>
-              
-              <div className="min-h-32 max-h-96 overflow-y-auto">
-                <QueueGroups
-                  waitingQueue={waitingQueue}
-                  activeSelector={activeSelector}
-                  setActiveSelector={setActiveSelector}
-                  availablePlayers={playerManager.availablePlayers}
-                  players={players}
-                  onPlayerMove={handlePlayerMove}
-                  onPlayerSwap={handlePlayerSwap}
-                  // 新增狀態 props
-                  restArea={restArea}
-                  courts={courts}
-                />
-              </div>
-            </div>
-
-            {/* 休息區 */}
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4 text-orange-600 flex items-center">
-                <Pause className="w-5 h-5 mr-2" />
-                休息區域
-              </h3>
-              <div 
-                className={`min-h-24 max-h-32 overflow-y-auto p-3 border-2 border-dashed rounded-lg transition-all duration-300 ${
-                  dragOverRest 
-                    ? 'border-orange-500 bg-orange-100' 
-                    : 'border-orange-300 bg-orange-50'
-                }`}
-                onDragOver={handleRestDragOver}
-                onDragLeave={handleRestDragLeave}
-                onDrop={handleRestDrop}
-              >
-                {restArea.length === 0 ? (
-                  <div className="text-center text-gray-500 py-4 flex flex-col items-center">
-                    <Pause className="w-6 h-6 mb-2 text-gray-400" />
-                    <div className="text-sm mb-2">
-                      {dragOverRest ? '放開以加入休息區' : '拖拽玩家到此處休息'}
-                    </div>
-                    <div className="text-xs text-gray-400 mb-3">或點擊下方按鈕</div>
+          {/* 頁籤內容 */}
+          <div className="p-6">
+            {activeTab === 'courts' && (
+              <div>
+                {/* 場地控制區 */}
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold flex items-center text-gray-800">
+                    <TrendingUp className="w-6 h-6 mr-3 text-green-600" />
+                    比賽場地管理 ({courts.length})
+                  </h2>
+                  <div className="flex space-x-3">
                     <button
-                      onClick={handleAddToRest}
-                      className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
-                      disabled={playerManager.availablePlayers.length === 0}
+                      onClick={handleAutoFillAllCourts}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                      disabled={waitingQueue.length < 4}
                     >
-                      添加休息玩家
+                      自動填滿空場地
+                    </button>
+                    <button
+                      onClick={handleResetPositions}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      重置所有位置
                     </button>
                   </div>
-                ) : (
-                  <PlayerSelector
-                    targetLocation={{ type: 'rest' }}
-                    currentPlayers={restArea}
-                    maxPlayers={Infinity}
-                    selectorId="rest-area"
+                </div>
+                
+                {/* 場地網格 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {courts.map((court) => (
+                    <CourtView
+                      key={court.id}
+                      court={court}
+                      onRemoveCourt={gameLogic.removeCourt}
+                      onSetWarmupTime={timerControls.setWarmupTime}
+                      onStartWarmup={timerControls.startWarmup}
+                      onPauseWarmup={timerControls.pauseWarmup}
+                      onResetWarmup={timerControls.resetWarmup}
+                      onStartGame={gameLogic.startGame}
+                      onEndGame={gameLogic.endGame}
+                      onQuickFillCourt={handleQuickFillCourt}
+                      activeSelector={activeSelector}
+                      setActiveSelector={setActiveSelector}
+                      availablePlayers={playerManager.availablePlayers}
+                      players={players}
+                      onPlayerMove={handlePlayerMove}
+                      onPlayerSwap={handlePlayerSwap}
+                      waitingQueue={waitingQueue}
+                      restArea={restArea}
+                      courts={courts}
+                    />
+                  ))}
+                </div>
+                
+                {/* 空狀態 */}
+                {courts.length === 0 && (
+                  <div className="text-center py-16 text-gray-500">
+                    <TrendingUp className="w-20 h-20 mx-auto mb-6 text-gray-300" />
+                    <div className="text-xl mb-3">尚未建立場地</div>
+                    <div className="text-sm mb-6 text-gray-400">點擊上方「新增場地」按鈕來建立第一個羽球場地</div>
+                    <button
+                      onClick={gameLogic.addCourt}
+                      className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                    >
+                      建立第一個場地
+                    </button>
+                  </div>
+                )}
+
+                {/* 場地操作說明 */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h4 className="text-sm font-semibold text-blue-700 mb-2">💡 場地操作說明</h4>
+                    <div className="text-xs text-blue-600 space-y-1">
+                      <div>• <strong>拖拽移動</strong>：拖拽玩家卡片到不同區域</div>
+                      <div>• <strong>直接互換</strong>：拖拽玩家到另一玩家上互換位置</div>
+                      <div>• <strong>點擊替換</strong>：點擊玩家卡片顯示替換選項</div>
+                      <div>• <strong>快速補位</strong>：使用「快速補位」按鈕自動分配玩家</div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <h4 className="text-sm font-semibold text-green-700 mb-2">⚡ 快速操作</h4>
+                    <div className="text-xs text-green-600 space-y-1">
+                      <div>• <strong>自動填滿</strong>：一鍵填滿所有空場地</div>
+                      <div>• <strong>重置位置</strong>：將所有玩家移回排隊區</div>
+                      <div>• <strong>計時功能</strong>：支援熱身和比賽計時</div>
+                      <div>• <strong>比賽記錄</strong>：自動記錄比賽結果和統計</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'queue' && (
+              <div>
+                {/* 排隊控制區 */}
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold flex items-center text-gray-800">
+                    <Users className="w-6 h-6 mr-3 text-blue-600" />
+                    排隊管理系統
+                  </h2>
+                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                      {waitingQueue.length} 人排隊
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                      {Math.ceil(waitingQueue.length / 4)} 組隊伍
+                    </div>
+                    {restArea.length > 0 && (
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
+                        {restArea.length} 人休息
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* 排隊區域 */}
+                <div className="bg-gray-50 rounded-lg p-6 min-h-96">
+                  <QueueGroups
+                    waitingQueue={waitingQueue}
                     activeSelector={activeSelector}
                     setActiveSelector={setActiveSelector}
                     availablePlayers={playerManager.availablePlayers}
                     players={players}
                     onPlayerMove={handlePlayerMove}
                     onPlayerSwap={handlePlayerSwap}
-                    // 新增狀態 props
-                    waitingQueue={waitingQueue}
                     restArea={restArea}
                     courts={courts}
                   />
-                )}
-                
-                {/* 拖拽提示 */}
-                {dragOverRest && restArea.length > 0 && (
-                  <div className="text-center text-orange-600 text-xs py-2 border-t border-orange-300 mt-2">
-                    放開以加入休息區
+                </div>
+
+                {/* 排隊操作說明 */}
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <h4 className="text-sm font-semibold text-purple-700 mb-2">🔄 排隊操作</h4>
+                    <div className="text-xs text-purple-600 space-y-1">
+                      <div>• <strong>自動分組</strong>：每4人自動組成一隊</div>
+                      <div>• <strong>隊伍調整</strong>：在組內拖拽調整A、B隊分配</div>
+                      <div>• <strong>跨組移動</strong>：可在不同組之間移動玩家</div>
+                      <div>• <strong>智能分隊</strong>：根據等級和勝率平衡隊伍</div>
+                    </div>
                   </div>
-                )}
+                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                    <h4 className="text-sm font-semibold text-orange-700 mb-2">☕ 休息管理</h4>
+                    <div className="text-xs text-orange-600 space-y-1">
+                      <div>• <strong>玩家管理頁面</strong>：在管理玩家中設定休息狀態</div>
+                      <div>• <strong>一鍵加入</strong>：休息中的玩家可快速加入排隊</div>
+                      <div>• <strong>狀態顯示</strong>：清楚顯示每位玩家的當前狀態</div>
+                      <div>• <strong>靈活調整</strong>：隨時調整玩家的參與狀態</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-gray-600 mt-2 font-medium">
-                休息人數: {restArea.length}
-              </div>
-            </div>
-
-            {/* 快速操作區 */}
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">快速操作</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={handleResetPositions}
-                  className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                >
-                  重置所有人員位置
-                </button>
-                <button
-                  onClick={handleAutoFillAllCourts}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                  disabled={waitingQueue.length < 4}
-                >
-                  自動分配到所有場地
-                </button>
-                <button
-                  onClick={() => setShowPlayerModal(true)}
-                  className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                >
-                  管理玩家資料
-                </button>
-              </div>
-            </div>
-
-            {/* 點擊替換說明 */}
-            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-              <h4 className="text-sm font-semibold text-purple-700 mb-2">🔄 點擊替換功能</h4>
-              <div className="text-xs text-purple-600 space-y-1">
-                <div>• <strong>點擊玩家卡片</strong>：顯示全員替換清單</div>
-                <div>• <strong>狀態顯示</strong>：🟢可用 🔵排隊 🟣場上 🟠休息</div>
-                <div>• <strong>分類清單</strong>：按狀態分組顯示所有玩家</div>
-                <div>• <strong>一鍵替換</strong>：點擊目標玩家完成替換</div>
-                <div>• <strong>跨區替換</strong>：可與任何區域的玩家替換</div>
-              </div>
-            </div>
-
-            {/* 拖拽說明 */}
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-              <h4 className="text-sm font-semibold text-blue-700 mb-2">💡 拖拽操作說明</h4>
-              <div className="text-xs text-blue-600 space-y-1">
-                <div>• <strong>拖拽移動</strong>：拖拽玩家卡片到不同區域</div>
-                <div>• <strong>直接互換</strong>：拖拽玩家到另一玩家上互換位置</div>
-                <div>• <strong>滿員替換</strong>：拖拽到滿員區域時選擇替換對象</div>
-                <div>• <strong>場地限制</strong>：A隊/B隊各最多2人</div>
-                <div>• <strong>視覺提示</strong>：拖拽時有高亮和提示效果</div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* 玩家管理模態框 */}
+        {/* 玩家管理模態框 - 傳遞 onPlayerMove */}
         <PlayerModal
           showModal={showPlayerModal}
           onClose={() => setShowPlayerModal(false)}
@@ -475,6 +482,7 @@ const BadmintonManager = () => {
           onSavePlayerInfo={playerManager.savePlayerInfo}
           onCancelEditPlayer={playerManager.cancelEditPlayer}
           onDeletePlayer={playerManager.deletePlayer}
+          onPlayerMove={handlePlayerMove}
         />
       </div>
     </div>

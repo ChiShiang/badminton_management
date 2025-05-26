@@ -13,9 +13,9 @@ const PlayerSelector = React.memo(({
   players,
   onPlayerMove,
   onPlayerSwap,
-  waitingQueue,
-  restArea,
-  courts
+  waitingQueue = [], // 添加預設值
+  restArea = [],     // 添加預設值
+  courts = []        // 添加預設值
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [showReplacementSelector, setShowReplacementSelector] = useState(false);
@@ -25,54 +25,93 @@ const PlayerSelector = React.memo(({
   
   const isShowingSelector = activeSelector === selectorId;
 
-  // 獲取玩家狀態的函數
+  // 獲取玩家狀態的函數 - 修正版本，添加錯誤處理
   const getPlayerStatus = useCallback((playerId) => {
-    const gameState = { waitingQueue, restArea, courts };
-    const location = findPlayerLocation(playerId, gameState);
-    
-    if (!location) {
-      return { type: 'available', text: '可用', color: 'bg-green-100 text-green-700' };
-    }
-    
-    switch (location.type) {
-      case 'waiting':
-        return { type: 'waiting', text: '排隊中', color: 'bg-blue-100 text-blue-700' };
-      case 'rest':
-        return { type: 'rest', text: '休息中', color: 'bg-orange-100 text-orange-700' };
-      case 'court':
-        const court = courts.find(c => c.id === location.courtId);
-        const courtName = court ? court.name : '場地';
-        const teamName = location.team === 'teamA' ? 'A隊' : 'B隊';
-        return { 
-          type: 'court', 
-          text: `${courtName} ${teamName}`, 
-          color: 'bg-purple-100 text-purple-700' 
-        };
-      default:
+    try {
+      // 確保所有參數都有效
+      if (!playerId) {
         return { type: 'unknown', text: '未知', color: 'bg-gray-100 text-gray-700' };
+      }
+
+      const gameState = { 
+        waitingQueue: waitingQueue || [], 
+        restArea: restArea || [], 
+        courts: courts || [] 
+      };
+      
+      const location = findPlayerLocation(playerId, gameState);
+      
+      if (!location) {
+        return { type: 'available', text: '可用', color: 'bg-green-100 text-green-700' };
+      }
+      
+      switch (location.type) {
+        case 'waiting':
+          return { type: 'waiting', text: '排隊中', color: 'bg-blue-100 text-blue-700' };
+        case 'rest':
+          return { type: 'rest', text: '休息中', color: 'bg-orange-100 text-orange-700' };
+        case 'court':
+          const court = (courts || []).find(c => c && c.id === location.courtId);
+          const courtName = court ? court.name : '場地';
+          const teamName = location.team === 'teamA' ? 'A隊' : 'B隊';
+          return { 
+            type: 'court', 
+            text: `${courtName} ${teamName}`, 
+            color: 'bg-purple-100 text-purple-700' 
+          };
+        default:
+          return { type: 'unknown', text: '未知', color: 'bg-gray-100 text-gray-700' };
+      }
+    } catch (error) {
+      console.error('getPlayerStatus 錯誤:', error, { playerId, waitingQueue, restArea, courts });
+      return { type: 'error', text: '錯誤', color: 'bg-red-100 text-red-700' };
     }
   }, [waitingQueue, restArea, courts]);
 
-  // 按狀態分組的玩家列表
+  // 按狀態分組的玩家列表 - 修正版本，添加錯誤處理
   const categorizedPlayers = useMemo(() => {
-    const categories = {
-      available: [],
-      waiting: [],
-      court: [],
-      rest: []
-    };
-    
-    players.forEach(player => {
-      const status = getPlayerStatus(player.id);
-      if (categories[status.type]) {
-        categories[status.type].push({
-          ...player,
-          status
-        });
+    try {
+      const categories = {
+        available: [],
+        waiting: [],
+        court: [],
+        rest: []
+      };
+      
+      if (!Array.isArray(players)) {
+        console.warn('players 不是數組:', players);
+        return categories;
       }
-    });
-    
-    return categories;
+      
+      players.forEach(player => {
+        if (!player || !player.id) {
+          console.warn('無效的玩家對象:', player);
+          return;
+        }
+
+        try {
+          const status = getPlayerStatus(player.id);
+          if (categories[status.type]) {
+            categories[status.type].push({
+              ...player,
+              status
+            });
+          }
+        } catch (error) {
+          console.error('處理玩家狀態時發生錯誤:', error, player);
+        }
+      });
+      
+      return categories;
+    } catch (error) {
+      console.error('categorizedPlayers 計算錯誤:', error);
+      return {
+        available: [],
+        waiting: [],
+        court: [],
+        rest: []
+      };
+    }
   }, [players, getPlayerStatus]);
   
   const handleToggleSelector = useCallback((playerId = null) => {
@@ -87,13 +126,19 @@ const PlayerSelector = React.memo(({
   }, [selectorId, isShowingSelector, setActiveSelector]);
 
   const handlePlayerSelect = useCallback((playerId, targetPlayerId = null) => {
-    const result = onPlayerMove(playerId, targetLocation, targetPlayerId);
-    setActiveSelector(null);
-    setShowReplacementSelector(false);
-    setShowPlayerSelector(false);
-    setDraggedPlayerId(null);
-    setSelectedPlayerForReplacement(null);
-    return result;
+    try {
+      const result = onPlayerMove(playerId, targetLocation, targetPlayerId);
+      setActiveSelector(null);
+      setShowReplacementSelector(false);
+      setShowPlayerSelector(false);
+      setDraggedPlayerId(null);
+      setSelectedPlayerForReplacement(null);
+      return result;
+    } catch (error) {
+      console.error('handlePlayerSelect 錯誤:', error);
+      alert('選擇玩家時發生錯誤，請重試');
+      return false;
+    }
   }, [onPlayerMove, targetLocation, setActiveSelector]);
 
   // 拖拽事件處理
@@ -118,7 +163,7 @@ const PlayerSelector = React.memo(({
     setIsDragOver(false);
     
     const playerId = e.dataTransfer.getData('text/plain');
-    if (!playerId || currentPlayers.includes(playerId)) {
+    if (!playerId || (Array.isArray(currentPlayers) && currentPlayers.includes(playerId))) {
       return;
     }
 
@@ -191,13 +236,13 @@ const PlayerSelector = React.memo(({
 
   // 顯示玩家選擇器（點擊現有玩家時）
   if (showPlayerSelector && selectedPlayerForReplacement) {
-    const selectedPlayer = players.find(p => p.id === selectedPlayerForReplacement);
-    const excludeIds = new Set(currentPlayers);
+    const selectedPlayer = (players || []).find(p => p && p.id === selectedPlayerForReplacement);
+    const excludeIds = new Set(currentPlayers || []);
     
     return (
       <div className="bg-purple-50 border-2 border-purple-400 rounded p-3 max-h-80 overflow-y-auto">
         <div className="text-sm text-purple-800 mb-2 font-medium">
-          選擇玩家替換：{selectedPlayer?.name}
+          選擇玩家替換：{selectedPlayer?.name || '未知玩家'}
         </div>
         <div className="text-xs text-purple-700 mb-3">
           點擊下方任一玩家進行替換
@@ -297,18 +342,18 @@ const PlayerSelector = React.memo(({
 
   // 顯示替換選擇器（拖拽到滿員區域時）
   if (showReplacementSelector && draggedPlayerId) {
-    const draggedPlayer = players.find(p => p.id === draggedPlayerId);
+    const draggedPlayer = (players || []).find(p => p && p.id === draggedPlayerId);
     return (
       <div className="bg-yellow-50 border-2 border-yellow-400 rounded p-3">
         <div className="text-sm text-yellow-800 mb-2 font-medium">
           選擇要被替換的玩家
         </div>
         <div className="text-xs text-yellow-700 mb-3">
-          {draggedPlayer?.name} 將替換選中的玩家
+          {draggedPlayer?.name || '未知玩家'} 將替換選中的玩家
         </div>
         <div className="space-y-2 max-h-32 overflow-y-auto">
-          {currentPlayers.map(playerId => {
-            const player = players.find(p => p.id === playerId);
+          {(currentPlayers || []).map(playerId => {
+            const player = (players || []).find(p => p && p.id === playerId);
             if (!player) return null;
             
             const status = getPlayerStatus(playerId);
@@ -349,7 +394,7 @@ const PlayerSelector = React.memo(({
       <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded p-2">
         <div className="text-xs text-gray-600 mb-2">選擇玩家：</div>
         <div className="max-h-32 overflow-y-auto space-y-1">
-          {availablePlayers.map(player => (
+          {(availablePlayers || []).map(player => (
             <PlayerCard
               key={player.id}
               player={player}
@@ -382,8 +427,8 @@ const PlayerSelector = React.memo(({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {currentPlayers.map(playerId => {
-        const player = players.find(p => p.id === playerId);
+      {(currentPlayers || []).map(playerId => {
+        const player = (players || []).find(p => p && p.id === playerId);
         return player ? (
           <PlayerCard
             key={player.id}
@@ -401,7 +446,7 @@ const PlayerSelector = React.memo(({
         ) : null;
       })}
       
-      {currentPlayers.length < maxPlayers && (
+      {(currentPlayers || []).length < maxPlayers && (
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -410,14 +455,14 @@ const PlayerSelector = React.memo(({
           }}
           className="w-full text-xs px-2 py-3 border-2 border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
-          + 添加玩家 ({currentPlayers.length}/{maxPlayers})
+          + 添加玩家 ({(currentPlayers || []).length}/{maxPlayers})
         </button>
       )}
       
       {/* 拖拽提示 */}
       {isDragOver && (
         <div className="text-center text-blue-600 text-xs py-2">
-          {currentPlayers.length >= maxPlayers 
+          {(currentPlayers || []).length >= maxPlayers 
             ? '放開以選擇替換對象' 
             : '放開以添加玩家'
           }

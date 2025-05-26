@@ -26,19 +26,49 @@ export const balanceTeams = (players) => {
   return { teamA, teamB };
 };
 
-// 找到玩家當前位置
-export const findPlayerLocation = (playerId, { waitingQueue, restArea, courts }) => {
-  if (waitingQueue.includes(playerId)) return { type: 'waiting' };
-  if (restArea.includes(playerId)) return { type: 'rest' };
-  
-  const court = courts.find(c => c.teamA.includes(playerId) || c.teamB.includes(playerId));
-  if (court) {
-    return {
-      type: 'court',
-      courtId: court.id,
-      team: court.teamA.includes(playerId) ? 'teamA' : 'teamB'
-    };
+// 找到玩家當前位置 - 修正版本，添加安全檢查
+export const findPlayerLocation = (playerId, gameState) => {
+  // 安全檢查：確保所有必要的參數都存在
+  if (!playerId || !gameState) {
+    console.warn('findPlayerLocation: 缺少必要參數', { playerId, gameState });
+    return null;
   }
+
+  const { waitingQueue = [], restArea = [], courts = [] } = gameState;
+
+  // 檢查排隊區
+  if (Array.isArray(waitingQueue) && waitingQueue.includes(playerId)) {
+    return { type: 'waiting' };
+  }
+  
+  // 檢查休息區
+  if (Array.isArray(restArea) && restArea.includes(playerId)) {
+    return { type: 'rest' };
+  }
+  
+  // 檢查場地
+  if (Array.isArray(courts)) {
+    for (const court of courts) {
+      if (court && court.teamA && court.teamB) {
+        if (Array.isArray(court.teamA) && court.teamA.includes(playerId)) {
+          return {
+            type: 'court',
+            courtId: court.id,
+            team: 'teamA'
+          };
+        }
+        if (Array.isArray(court.teamB) && court.teamB.includes(playerId)) {
+          return {
+            type: 'court',
+            courtId: court.id,
+            team: 'teamB'
+          };
+        }
+      }
+    }
+  }
+  
+  // 找不到玩家位置
   return null;
 };
 
