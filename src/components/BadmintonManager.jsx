@@ -417,7 +417,7 @@ const BadmintonManager = () => {
                 </div>
                 
                 {/* 排隊區域 */}
-                <div className="bg-gray-50 rounded-lg p-6 min-h-96">
+                <div className="bg-gray-50 rounded-lg p-4 min-h-96">
                   <QueueGroups
                     waitingQueue={waitingQueue}
                     activeSelector={activeSelector}
