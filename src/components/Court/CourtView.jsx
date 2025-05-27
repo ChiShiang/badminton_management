@@ -26,11 +26,26 @@ const CourtView = React.memo(({
 }) => {
   const totalPlayers = court.teamA.length + court.teamB.length;
 
+  // 修正：快速補位功能 - 確保正確檢查排隊區人數
   const handleQuickFillCourt = () => {
-    if (availablePlayers.length >= 4) {
+    console.log('⚡ 快速補位點擊:', { 
+      courtId: court.id, 
+      waitingQueueLength: waitingQueue.length,
+      courtPlayers: totalPlayers
+    });
+    
+    // 檢查場地是否為空
+    if (totalPlayers > 0) {
+      alert('此場地已有玩家，請先清空場地或使用替換功能');
+      return;
+    }
+    
+    // 檢查排隊區人數
+    if (waitingQueue.length >= 4) {
+      console.log('✅ 排隊區人數足夠，執行快速補位');
       onQuickFillCourt(court.id);
     } else {
-      alert(`排隊區人數不足，需要4人但只有${availablePlayers.length}人`);
+      alert(`排隊區人數不足，需要4人但只有${waitingQueue.length}人`);
     }
   };
 
@@ -107,6 +122,7 @@ const CourtView = React.memo(({
               waitingQueue={waitingQueue}
               restArea={restArea}
               courts={courts}
+              isQueue={false}
             />
           </div>
         </div>
@@ -131,6 +147,7 @@ const CourtView = React.memo(({
               waitingQueue={waitingQueue}
               restArea={restArea}
               courts={courts}
+              isQueue={false}
             />
           </div>
         </div>
@@ -170,15 +187,22 @@ const CourtView = React.memo(({
         </div>
       )}
 
-      {/* 快速操作按鈕 */}
+      {/* 修正：快速操作按鈕 - 確保條件判斷正確 */}
       {!court.isGameActive && totalPlayers === 0 && (
         <div className="mt-3">
           <button
             onClick={handleQuickFillCourt}
-            className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
-            disabled={availablePlayers.length < 4}
+            className={`w-full px-3 py-2 rounded text-sm transition-colors font-medium ${
+              waitingQueue.length >= 4 
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+            disabled={waitingQueue.length < 4}
           >
-            快速補位 (需要4人)
+            {waitingQueue.length >= 4 
+              ? '快速補位 (4人)' 
+              : `快速補位 (需要${4 - waitingQueue.length}人)`
+            }
           </button>
         </div>
       )}
@@ -211,11 +235,23 @@ const CourtView = React.memo(({
       {totalPlayers >= 1 && (
         <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
           <div className="text-xs text-purple-700 space-y-1">
-            <div>🔄 <strong>點擊替換：</strong></div>
+            <div>🔄 <strong>操作說明：</strong></div>
             <div>• 點擊任一玩家顯示全員替換清單</div>
             <div>• 拖拽玩家到另一玩家上可直接互換</div>
             <div>• 支援與排隊區、休息區玩家替換</div>
             <div>• A隊↔B隊之間也可以互換</div>
+          </div>
+        </div>
+      )}
+
+      {/* 修正：自動補位提示 */}
+      {!court.isGameActive && totalPlayers === 0 && waitingQueue.length > 0 && waitingQueue.length < 4 && (
+        <div className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
+          <div className="text-xs text-blue-700 text-center">
+            目前排隊區有 {waitingQueue.length} 人，需要 {4 - waitingQueue.length} 人才能快速補位
+          </div>
+          <div className="text-xs text-blue-600 text-center mt-1">
+            請在玩家管理中新增更多玩家或手動拖拽玩家到場地
           </div>
         </div>
       )}

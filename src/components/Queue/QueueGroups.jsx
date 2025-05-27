@@ -15,18 +15,24 @@ const QueueGroups = React.memo(({
 }) => {
   const [dragOverQueue, setDragOverQueue] = useState(false);
 
-  // 將排隊人員分組，每4人一組
+  // 將排隊人員分組，每4人一組，並正確分配到A/B隊
   const groups = [];
   for (let i = 0; i < waitingQueue.length; i += 4) {
-    groups.push(waitingQueue.slice(i, i + 4));
+    const groupPlayers = waitingQueue.slice(i, i + 4);
+    groups.push({
+      teamA: groupPlayers.slice(0, 2), // 前兩人為A隊
+      teamB: groupPlayers.slice(2, 4), // 後兩人為B隊
+      totalPlayers: groupPlayers.length
+    });
   }
 
-  // 如果沒有完整的組或者沒有人排隊，顯示空組
-  if (waitingQueue.length % 4 !== 0 || waitingQueue.length === 0) {
-    const lastGroupSize = waitingQueue.length % 4;
-    if (lastGroupSize === 0 && waitingQueue.length === 0) {
-      groups.push([]); // 完全空的組
-    }
+  // 如果沒有人排隊，顯示空組
+  if (waitingQueue.length === 0) {
+    groups.push({
+      teamA: [],
+      teamB: [],
+      totalPlayers: 0
+    });
   }
 
   const handleStartQueue = () => {
@@ -68,7 +74,7 @@ const QueueGroups = React.memo(({
   const scrollContainer = (direction) => {
     const container = document.getElementById('queue-scroll-container');
     if (container) {
-      const scrollAmount = 240; // 約一個卡片的寬度(56*4=224) + gap(16)
+      const scrollAmount = 240;
       container.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
@@ -76,8 +82,34 @@ const QueueGroups = React.memo(({
     }
   };
 
+  // 修正的玩家移動處理 - 確保在排隊區內移動時保持正確順序
+  const handleQueuePlayerMove = useCallback((playerId, targetLocation, targetPlayerId = null) => {
+    console.log('🔄 排隊區玩家移動:', { playerId, targetLocation, targetPlayerId });
+    
+    // 如果是在排隊區內的操作，使用互換邏輯
+    if (targetPlayerId && waitingQueue.includes(playerId) && waitingQueue.includes(targetPlayerId)) {
+      console.log('🔄 排隊區內互換:', { playerId, targetPlayerId });
+      return onPlayerSwap(playerId, targetPlayerId);
+    }
+    
+    // 其他情況使用正常的移動邏輯
+    return onPlayerMove(playerId, targetLocation, targetPlayerId);
+  }, [waitingQueue, onPlayerMove, onPlayerSwap]);
+
   return (
     <div className="space-y-4">
+      {/* 排隊區說明 */}
+      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+        <div className="text-sm text-blue-700">
+          <div className="font-semibold mb-1">📋 排隊順序說明</div>
+          <div className="text-xs space-y-1">
+            <div>• <strong>隊伍分配：</strong>按排隊順序，每4人為一組（第1、2人為A隊，第3、4人為B隊）</div>
+            <div>• <strong>場地分配：</strong>完整的4人組會優先分配到空場地</div>
+            <div>• <strong>順序調整：</strong>可在組內拖拽調整位置，或點擊玩家選擇替換</div>
+          </div>
+        </div>
+      </div>
+
       {/* 水平滾動容器 */}
       {groups.length > 0 && waitingQueue.length > 0 && (
         <div className="relative">
@@ -116,49 +148,62 @@ const QueueGroups = React.memo(({
             {groups.map((group, groupIndex) => (
               <div 
                 key={groupIndex} 
-                className="flex-shrink-0 w-56 border-2 border-dashed border-blue-300 rounded-lg p-2 bg-blue-50"
+                className={`flex-shrink-0 w-56 border-2 rounded-lg p-2 ${
+                  group.totalPlayers === 4 
+                    ? 'border-green-300 bg-green-50' 
+                    : 'border-blue-300 bg-blue-50'
+                }`}
               >
-                <div className="text-xs font-medium text-blue-700 mb-2 text-center">
-                  第 {groupIndex + 1} 組 ({group.length}/4人)
+                <div className="text-xs font-medium text-center mb-2">
+                  <span className={group.totalPlayers === 4 ? 'text-green-700' : 'text-blue-700'}>
+                    第 {groupIndex + 1} 組 ({group.totalPlayers}/4人)
+                    {group.totalPlayers === 4 && <span className="ml-1">✅ 可上場</span>}
+                  </span>
                 </div>
                 <div className="space-y-1.5">
                   {/* 隊伍A */}
-                  <div className="border border-blue-200 rounded p-1.5 bg-white min-h-14">
-                    <div className="text-xs text-blue-600 font-medium mb-1 text-center">隊伍A</div>
+                  <div className="border border-red-200 rounded p-1.5 bg-white min-h-14">
+                    <div className="text-xs text-red-600 font-medium mb-1 text-center">
+                      A隊 ({group.teamA.length}/2) - 排隊位置 {groupIndex * 4 + 1}, {groupIndex * 4 + 2}
+                    </div>
                     <PlayerSelector
                       targetLocation={{ type: 'waiting' }}
-                      currentPlayers={group.slice(0, 2)}
+                      currentPlayers={group.teamA}
                       maxPlayers={2}
                       selectorId={`queue-${groupIndex}-A`}
                       activeSelector={activeSelector}
                       setActiveSelector={setActiveSelector}
                       availablePlayers={availablePlayers}
                       players={players}
-                      onPlayerMove={onPlayerMove}
+                      onPlayerMove={handleQueuePlayerMove}
                       onPlayerSwap={onPlayerSwap}
                       waitingQueue={waitingQueue}
                       restArea={restArea}
                       courts={courts}
+                      isQueue={true}
                     />
                   </div>
                   
                   {/* 隊伍B */}
-                  <div className="border border-red-200 rounded p-1.5 bg-white min-h-14">
-                    <div className="text-xs text-red-600 font-medium mb-1 text-center">隊伍B</div>
+                  <div className="border border-blue-200 rounded p-1.5 bg-white min-h-14">
+                    <div className="text-xs text-blue-600 font-medium mb-1 text-center">
+                      B隊 ({group.teamB.length}/2) - 排隊位置 {groupIndex * 4 + 3}, {groupIndex * 4 + 4}
+                    </div>
                     <PlayerSelector
                       targetLocation={{ type: 'waiting' }}
-                      currentPlayers={group.slice(2, 4)}
+                      currentPlayers={group.teamB}
                       maxPlayers={2}
                       selectorId={`queue-${groupIndex}-B`}
                       activeSelector={activeSelector}
                       setActiveSelector={setActiveSelector}
                       availablePlayers={availablePlayers}
                       players={players}
-                      onPlayerMove={onPlayerMove}
+                      onPlayerMove={handleQueuePlayerMove}
                       onPlayerSwap={onPlayerSwap}
                       waitingQueue={waitingQueue}
                       restArea={restArea}
                       courts={courts}
+                      isQueue={true}
                     />
                   </div>
                 </div>
@@ -228,29 +273,10 @@ const QueueGroups = React.memo(({
         </div>
       )}
 
-      {/* 快速排隊區域 - 當有人排隊時顯示 */}
-      {waitingQueue.length > 0 && (
-        <div 
-          className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
-            dragOverQueue 
-              ? 'border-blue-400 bg-blue-50' 
-              : 'border-blue-300 bg-blue-25'
-          }`}
-          onDragOver={handleQueueDragOver}
-          onDragLeave={handleQueueDragLeave}
-          onDrop={handleQueueDrop}
-        >
-          <div className="text-center text-blue-600 text-sm">
-            <Users className="w-6 h-6 mx-auto mb-2" />
-            {dragOverQueue ? '放開以加入排隊' : '拖拽玩家到此處加入排隊'}
-          </div>
-        </div>
-      )}
-
       {/* 排隊統計信息 */}
       {waitingQueue.length > 0 && (
         <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-4 text-center">
             <div>
               <div className="text-xl font-bold text-blue-600">{waitingQueue.length}</div>
               <div className="text-xs text-gray-600">排隊人數</div>
@@ -261,9 +287,15 @@ const QueueGroups = React.memo(({
             </div>
             <div>
               <div className="text-xl font-bold text-orange-600">
-                {groups.filter(group => group.length === 4).length}
+                {groups.filter(group => group.totalPlayers === 4).length}
               </div>
               <div className="text-xs text-gray-600">完整隊伍</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-purple-600">
+                {waitingQueue.length % 4}
+              </div>
+              <div className="text-xs text-gray-600">等待配對</div>
             </div>
           </div>
         </div>
@@ -274,11 +306,11 @@ const QueueGroups = React.memo(({
         <div className="bg-blue-25 border border-blue-200 rounded-lg p-3">
           <div className="text-xs text-blue-700 space-y-1">
             <div>💡 <strong>排隊區操作提示：</strong></div>
-            <div>• 每組4人會自動分為A、B兩隊</div>
-            <div>• 可在組內拖拽調整隊伍分配</div>
-            <div>• 點擊玩家可從全員中選擇替換</div>
+            <div>• <strong>分隊順序：</strong>每4人自動分組，位置1、2為A隊，位置3、4為B隊</div>
+            <div>• <strong>上場順序：</strong>完整的4人組優先分配到空場地</div>
+            <div>• <strong>位置調整：</strong>可拖拽玩家調整排隊順序</div>
+            <div>• <strong>隊伍平衡：</strong>系統會按排隊順序分配，保持公平性</div>
             <div>• <strong>平板操作：</strong>左右滑動查看更多排隊組</div>
-            <div>• 拖拽到其他玩家上可直接互換位置</div>
           </div>
         </div>
       )}
