@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =================================
-   基礎樣式設定
+   基礎樣式設定 + 夜覽模式支援
    ================================= */
 body {
   margin: 0;
@@ -13,6 +13,13 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 夜覽模式基礎樣式 */
+body.dark {
+  background-color: #111827;
+  color: #f3f4f6;
 }
 
 code {
@@ -21,7 +28,42 @@ code {
 }
 
 /* =================================
-   拖拽系統樣式
+   夜覽模式全域樣式
+   ================================= */
+
+/* 滾動條夜覽模式 */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* 選取文字顏色 */
+.dark ::selection {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.dark ::-moz-selection {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+/* =================================
+   拖拽系統樣式 + 夜覽模式
    ================================= */
 
 /* 防止全域文字選取 */
@@ -40,12 +82,24 @@ code {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
   border-color: #3b82f6 !important;
   cursor: grabbing !important;
+  transition: all 0.2s ease;
+}
+
+.dark .dragging {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+  border-color: #60a5fa !important;
 }
 
 .drag-over {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: #3b82f6 !important;
   border-style: solid !important;
+  transition: all 0.3s ease;
+}
+
+.dark .drag-over {
+  background-color: rgba(96, 165, 250, 0.2);
+  border-color: #60a5fa !important;
 }
 
 /* 拖拽區域樣式 */
@@ -62,10 +116,19 @@ code {
   border-color: #6b7280;
 }
 
+.dark .drop-zone:hover {
+  border-color: #9ca3af;
+}
+
 .drop-zone.drag-over {
   background-color: rgba(59, 130, 246, 0.05);
   border-color: #3b82f6;
   transform: scale(1.02);
+}
+
+.dark .drop-zone.drag-over {
+  background-color: rgba(96, 165, 250, 0.15);
+  border-color: #60a5fa;
 }
 
 .drop-zone.drag-over::before {
@@ -77,6 +140,11 @@ code {
   background: rgba(59, 130, 246, 0.05);
   animation: dragPulse 1.5s ease-in-out infinite;
   pointer-events: none;
+}
+
+.dark .drop-zone.drag-over::before {
+  border-color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
 }
 
 /* 玩家卡片拖拽樣式 */
@@ -93,6 +161,10 @@ code {
 .player-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .player-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .player-card.dragging {
@@ -123,7 +195,7 @@ code {
 }
 
 /* =================================
-   特殊區域樣式
+   特殊區域樣式 + 夜覽模式
    ================================= */
 
 /* 排隊區域 */
@@ -140,9 +212,18 @@ code {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
 }
 
+.dark .queue-zone.empty {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+}
+
 .queue-zone.drag-over {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   border-color: #3b82f6;
+}
+
+.dark .queue-zone.drag-over {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+  border-color: #60a5fa;
 }
 
 /* 場地區域 */
@@ -160,9 +241,19 @@ code {
   border-color: #ef4444;
 }
 
+.dark .court-team-area.drag-over {
+  background-color: rgba(248, 113, 113, 0.2);
+  border-color: #f87171;
+}
+
 .court-team-area.team-b.drag-over {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: #3b82f6;
+}
+
+.dark .court-team-area.team-b.drag-over {
+  background-color: rgba(96, 165, 250, 0.2);
+  border-color: #60a5fa;
 }
 
 /* 休息區域 */
@@ -177,14 +268,24 @@ code {
   user-select: none;
 }
 
+.dark .rest-area {
+  background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+  border-color: #fb923c;
+}
+
 .rest-area.drag-over {
   background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
   border-color: #ea580c;
   transform: scale(1.02);
 }
 
+.dark .rest-area.drag-over {
+  background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+  border-color: #f87171;
+}
+
 /* =================================
-   選擇器樣式
+   選擇器樣式 + 夜覽模式
    ================================= */
 
 /* 替換選擇器 */
@@ -196,6 +297,11 @@ code {
   overflow-y: auto;
 }
 
+.dark .replacement-selector {
+  background: linear-gradient(135deg, #451a03 0%, #92400e 100%);
+  border-color: #d97706;
+}
+
 /* 玩家選擇器 */
 .player-selector {
   background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
@@ -203,6 +309,11 @@ code {
   animation: fadeInScale 0.3s ease-out;
   max-height: 400px;
   overflow-y: auto;
+}
+
+.dark .player-selector {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  border-color: #818cf8;
 }
 
 /* 互換提示樣式 */
@@ -220,8 +331,40 @@ code {
   pointer-events: none;
 }
 
+.dark .swap-indicator {
+  background: rgba(74, 222, 128, 0.3);
+  color: #22c55e;
+}
+
 /* =================================
-   動畫定義
+   夜覽模式按鈕樣式
+   ================================= */
+
+/* 主要按鈕夜覽模式 */
+.dark .btn-primary {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  border-color: #3b82f6;
+}
+
+.dark .btn-primary:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border-color: #60a5fa;
+}
+
+/* 次要按鈕夜覽模式 */
+.dark .btn-secondary {
+  background: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+.dark .btn-secondary:hover {
+  background: #4b5563;
+  border-color: #6b7280;
+}
+
+/* =================================
+   動畫定義 + 夜覽模式優化
    ================================= */
 
 @keyframes dragPulse {
@@ -255,6 +398,15 @@ code {
   }
 }
 
+@keyframes swapPulseDark {
+  0%, 100% {
+    background-color: rgba(74, 222, 128, 0.2);
+  }
+  50% {
+    background-color: rgba(74, 222, 128, 0.4);
+  }
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -268,44 +420,43 @@ code {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* =================================
-   滾動條樣式
-   ================================= */
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* 夜覽模式專用動畫 */
+.dark-mode-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* =================================
-   防止意外操作
+   表單元素夜覽模式
    ================================= */
 
-/* 防止意外的選取行為 */
-body.dragging {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  cursor: grabbing !important;
+.dark input[type="text"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark select,
+.dark textarea {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
 }
 
-body.dragging * {
-  cursor: grabbing !important;
+.dark input[type="text"]:focus,
+.dark input[type="number"]:focus,
+.dark input[type="search"]:focus,
+.dark select:focus,
+.dark textarea:focus {
+  background-color: #4b5563;
+  border-color: #60a5fa;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
 }
+
+.dark input::placeholder {
+  color: #9ca3af;
+}
+
+/* =================================
+   無障礙設計 + 夜覽模式
+   ================================= */
 
 /* 無障礙設計 */
 .player-card:focus {
@@ -313,13 +464,22 @@ body.dragging * {
   outline-offset: 2px;
 }
 
+.dark .player-card:focus {
+  outline-color: #60a5fa;
+}
+
 .drop-zone:focus-within {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.dark .drop-zone:focus-within {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
 /* =================================
-   響應式設計
+   響應式設計 + 夜覽模式
    ================================= */
 
 @media (max-width: 768px) {
@@ -360,17 +520,31 @@ body.dragging * {
 }
 
 /* =================================
-   無障礙和偏好設定
+   載入動畫夜覽模式
    ================================= */
 
-/* 印刷樣式 */
+.dark .loading-screen {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+}
+
+.dark .loading-spinner {
+  border-color: rgba(255,255,255,0.2);
+  border-top-color: #60a5fa;
+}
+
+/* =================================
+   印刷樣式
+   ================================= */
+
 @media print {
   .no-print {
     display: none !important;
   }
   
-  body {
-    background: white;
+  body,
+  body.dark {
+    background: white !important;
+    color: black !important;
   }
   
   .bg-gradient-to-br {
@@ -378,7 +552,10 @@ body.dragging * {
   }
 }
 
-/* 高對比度模式支援 */
+/* =================================
+   高對比度模式支援
+   ================================= */
+
 @media (prefers-contrast: high) {
   .border-gray-200 {
     border-color: #000000;
@@ -388,9 +565,22 @@ body.dragging * {
     color: #000000;
   }
   
+  .dark .border-gray-600 {
+    border-color: #ffffff;
+  }
+  
+  .dark .text-gray-400 {
+    color: #ffffff;
+  }
+  
   .dragging {
     border: 3px solid #000000 !important;
     background-color: #ffffff !important;
+  }
+  
+  .dark .dragging {
+    border: 3px solid #ffffff !important;
+    background-color: #000000 !important;
   }
   
   .drag-over {
@@ -398,18 +588,16 @@ body.dragging * {
     background-color: #ffff00 !important;
   }
   
-  .replacement-selector {
-    border: 3px solid #000000 !important;
-    background-color: #ffff00 !important;
-  }
-  
-  .player-selector {
-    border: 3px solid #000000 !important;
-    background-color: #00ffff !important;
+  .dark .drag-over {
+    border: 3px solid #ffffff !important;
+    background-color: #0000ff !important;
   }
 }
 
-/* 減少動畫偏好 */
+/* =================================
+   減少動畫偏好
+   ================================= */
+
 @media (prefers-reduced-motion: reduce) {
   *, 
   *::before, 
@@ -425,9 +613,132 @@ body.dragging * {
   .drop-zone,
   .player-card,
   .replacement-selector,
-  .player-selector {
+  .player-selector,
+  .dark-mode-transition {
     transition: none !important;
     animation: none !important;
     transform: none !important;
+  }
+}
+
+/* =================================
+   夜覽模式特殊效果
+   ================================= */
+
+/* 夜覽模式漸層效果 */
+.dark-gradient-bg {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+/* 夜覽模式卡片效果 */
+.dark-card {
+  background: rgba(31, 41, 55, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+/* 夜覽模式玻璃效果 */
+.dark-glass {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(75, 85, 99, 0.2);
+}
+
+/* 夜覽模式文字發光效果 */
+.dark-glow {
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+}
+
+/* =================================
+   自定義滾動條主題
+   ================================= */
+
+/* 整體滾動條樣式 */
+.scrollbar-custom {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.dark .scrollbar-custom {
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.scrollbar-custom::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.dark .scrollbar-custom::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark .scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* =================================
+   工具類別
+   ================================= */
+
+/* 快速夜覽模式切換 */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 夜覽模式邊框 */
+.dark-border {
+  border-color: #374151;
+}
+
+.dark .dark-border {
+  border-color: #4b5563;
+}
+
+/* 夜覽模式懸停效果 */
+.dark-hover:hover {
+  background-color: #374151;
+}
+
+.dark .dark-hover:hover {
+  background-color: #4b5563;
+}
+
+/* iPad 專用優化 */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .ipad-optimized {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  
+  .ipad-card {
+    min-height: 120px;
+    padding: 12px;
+  }
+  
+  .ipad-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+  
+  .ipad-scroll > * {
+    scroll-snap-align: start;
   }
 }

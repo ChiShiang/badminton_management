@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
 import CourtTimer from './CourtTimer';
-import PlayerSelector from '../Player/PlayerSelector';
+import UnifiedPlayerSelector from '../Player/UnifiedPlayerSelector';
 
 const CourtView = React.memo(({ 
   court, 
@@ -26,26 +26,11 @@ const CourtView = React.memo(({
 }) => {
   const totalPlayers = court.teamA.length + court.teamB.length;
 
-  // 修正：快速補位功能 - 確保正確檢查排隊區人數
   const handleQuickFillCourt = () => {
-    console.log('⚡ 快速補位點擊:', { 
-      courtId: court.id, 
-      waitingQueueLength: waitingQueue.length,
-      courtPlayers: totalPlayers
-    });
-    
-    // 檢查場地是否為空
-    if (totalPlayers > 0) {
-      alert('此場地已有玩家，請先清空場地或使用替換功能');
-      return;
-    }
-    
-    // 檢查排隊區人數
-    if (waitingQueue.length >= 4) {
-      console.log('✅ 排隊區人數足夠，執行快速補位');
+    if (availablePlayers.length >= 4) {
       onQuickFillCourt(court.id);
     } else {
-      alert(`排隊區人數不足，需要4人但只有${waitingQueue.length}人`);
+      alert(`排隊區人數不足，需要4人但只有${availablePlayers.length}人`);
     }
   };
 
@@ -108,7 +93,7 @@ const CourtView = React.memo(({
             A隊 ({court.teamA.length}/2)
           </div>
           <div className="flex-1">
-            <PlayerSelector
+            <UnifiedPlayerSelector
               targetLocation={{ type: 'court', courtId: court.id, team: 'teamA' }}
               currentPlayers={court.teamA}
               maxPlayers={2}
@@ -122,7 +107,9 @@ const CourtView = React.memo(({
               waitingQueue={waitingQueue}
               restArea={restArea}
               courts={courts}
-              isQueue={false}
+              title={`${court.name} A隊選擇`}
+              allowReplace={true}
+              showStatus={true}
             />
           </div>
         </div>
@@ -133,7 +120,7 @@ const CourtView = React.memo(({
             B隊 ({court.teamB.length}/2)
           </div>
           <div className="flex-1">
-            <PlayerSelector
+            <UnifiedPlayerSelector
               targetLocation={{ type: 'court', courtId: court.id, team: 'teamB' }}
               currentPlayers={court.teamB}
               maxPlayers={2}
@@ -147,7 +134,9 @@ const CourtView = React.memo(({
               waitingQueue={waitingQueue}
               restArea={restArea}
               courts={courts}
-              isQueue={false}
+              title={`${court.name} B隊選擇`}
+              allowReplace={true}
+              showStatus={true}
             />
           </div>
         </div>
@@ -187,22 +176,15 @@ const CourtView = React.memo(({
         </div>
       )}
 
-      {/* 修正：快速操作按鈕 - 確保條件判斷正確 */}
+      {/* 快速操作按鈕 */}
       {!court.isGameActive && totalPlayers === 0 && (
         <div className="mt-3">
           <button
             onClick={handleQuickFillCourt}
-            className={`w-full px-3 py-2 rounded text-sm transition-colors font-medium ${
-              waitingQueue.length >= 4 
-                ? 'bg-green-500 text-white hover:bg-green-600' 
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-            disabled={waitingQueue.length < 4}
+            className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
+            disabled={availablePlayers.length < 4}
           >
-            {waitingQueue.length >= 4 
-              ? '快速補位 (4人)' 
-              : `快速補位 (需要${4 - waitingQueue.length}人)`
-            }
+            快速補位 (需要4人)
           </button>
         </div>
       )}
@@ -214,7 +196,7 @@ const CourtView = React.memo(({
             還需要 {4 - totalPlayers} 人才能開始比賽
           </div>
           <div className="text-xs text-yellow-600 text-center mt-1">
-            拖拽玩家到A隊或B隊區域，或點擊玩家選擇替換
+            點擊「添加玩家」按鈕選擇隊員，或拖拽玩家到對應隊伍
           </div>
         </div>
       )}
@@ -231,27 +213,15 @@ const CourtView = React.memo(({
         </div>
       )}
 
-      {/* 點擊替換提示 */}
+      {/* 新版操作提示 */}
       {totalPlayers >= 1 && (
-        <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
-          <div className="text-xs text-purple-700 space-y-1">
-            <div>🔄 <strong>操作說明：</strong></div>
-            <div>• 點擊任一玩家顯示全員替換清單</div>
-            <div>• 拖拽玩家到另一玩家上可直接互換</div>
-            <div>• 支援與排隊區、休息區玩家替換</div>
-            <div>• A隊↔B隊之間也可以互換</div>
-          </div>
-        </div>
-      )}
-
-      {/* 修正：自動補位提示 */}
-      {!court.isGameActive && totalPlayers === 0 && waitingQueue.length > 0 && waitingQueue.length < 4 && (
         <div className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
-          <div className="text-xs text-blue-700 text-center">
-            目前排隊區有 {waitingQueue.length} 人，需要 {4 - waitingQueue.length} 人才能快速補位
-          </div>
-          <div className="text-xs text-blue-600 text-center mt-1">
-            請在玩家管理中新增更多玩家或手動拖拽玩家到場地
+          <div className="text-xs text-blue-700 space-y-1">
+            <div>🎯 <strong>全新選擇體驗：</strong></div>
+            <div>• 點擊「添加玩家」開啟智能選擇介面</div>
+            <div>• 支援搜尋玩家名稱和狀態篩選</div>
+            <div>• 點擊現有玩家可進行替換操作</div>
+            <div>• 拖拽玩家仍可直接互換位置</div>
           </div>
         </div>
       )}
