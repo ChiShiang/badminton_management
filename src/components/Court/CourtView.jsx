@@ -221,7 +221,6 @@ const CourtView = React.memo(({
             <div>• 點擊「添加玩家」開啟智能選擇介面</div>
             <div>• 支援搜尋玩家名稱和狀態篩選</div>
             <div>• 點擊現有玩家可進行替換操作</div>
-            <div>• 拖拽玩家仍可直接互換位置</div>
           </div>
         </div>
       )}
