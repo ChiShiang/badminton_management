@@ -177,7 +177,7 @@ const CourtView = React.memo(({
       )}
 
       {/* 快速操作按鈕 */}
-      {!court.isGameActive && totalPlayers === 0 && (
+      {/* {!court.isGameActive && totalPlayers === 0 && (
         <div className="mt-3">
           <button
             onClick={handleQuickFillCourt}
@@ -187,7 +187,7 @@ const CourtView = React.memo(({
             快速補位 (需要4人)
           </button>
         </div>
-      )}
+      )} */}
 
       {/* 場地操作提示 */}
       {!court.isGameActive && totalPlayers > 0 && totalPlayers < 4 && (
